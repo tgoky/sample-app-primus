@@ -1,0 +1,320 @@
+/* Base styles */
+.app-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    transition: background-color 0.3s ease;
+  }
+  
+  .light-mode {
+    background: linear-gradient(135deg, #e6f0fa 0%, #f0f4f8 100%);
+  }
+  
+  .dark-mode {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  }
+  
+  /* Theme toggle button */
+  .theme-toggle {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+  }
+  
+  .light-mode .theme-toggle {
+    color: #333;
+  }
+  
+  .dark-mode .theme-toggle {
+    color: #ffd700;
+  }
+  
+  .theme-toggle:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: scale(1.1);
+  }
+  
+  /* Card styles */
+  .card {
+    background: #ffffff;
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    max-width: 400px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .dark-mode .card {
+    background: #2a2a3a;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+  
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  }
+  
+  .card-title {
+    font-size: 28px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 24px;
+    color: #1a1a2e;
+  }
+  
+  .dark-mode .card-title {
+    color: #ffffff;
+  }
+  
+  /* Button styles */
+  .verify-button {
+    width: 100%;
+    padding: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    color: #ffffff;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+  
+  .verify-button:hover:not(.verifying) {
+    background: linear-gradient(90deg, #0056b3, #003d80);
+    transform: scale(1.05);
+  }
+  
+  .verify-button.verifying {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+  
+  .button-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .button-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  /* Dialog styles */
+  .dialog-content {
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  }
+  
+  .dark-mode .dialog-content {
+    background: #2a2a3a;
+  }
+  
+  .dialog-title {
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    color: #1a1a2e;
+  }
+  
+  .dark-mode .dialog-title {
+    color: #ffffff;
+  }
+  
+  .dialog-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+  }
+  
+  .status-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+  }
+  
+  .status-icon.verifying {
+    background: #e7f1ff;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  
+  .dark-mode .status-icon.verifying {
+    background: #1e3a8a;
+  }
+  
+  .status-icon.verified {
+    background: #e6ffed;
+  }
+  
+  .dark-mode .status-icon.verified {
+    background: #065f46;
+  }
+  
+  .status-icon.failed {
+    background: #ffe6e6;
+  }
+  
+  .dark-mode .status-icon.failed {
+    background: #7f1d1d;
+  }
+  
+  .icon {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .status-icon.verifying .icon {
+    color: #2563eb;
+    animation: spin 1s linear infinite;
+  }
+  
+  .status-icon.verified .icon {
+    color: #16a34a;
+  }
+  
+  .status-icon.failed .icon {
+    color: #dc2626;
+  }
+  
+  .status-text {
+    font-size: 14px;
+    text-align: center;
+    color: #333;
+  }
+  
+  .dark-mode .status-text {
+    color: #e5e7eb;
+  }
+  
+  .status-text.error {
+    color: #dc2626;
+  }
+  
+  .link {
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.2s ease;
+  }
+  
+  .dark-mode .link {
+    color: #60a5fa;
+  }
+  
+  .link:hover {
+    text-decoration: underline;
+  }
+  
+  .action-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #16a34a, #15803d);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+  
+  .action-button:hover {
+    background: linear-gradient(90deg, #15803d, #14532d);
+    transform: scale(1.05);
+  }
+  
+  .action-button.outline {
+    background: none;
+    border: 1px solid #333;
+    color: #333;
+  }
+  
+  .dark-mode .action-button.outline {
+    border-color: #e5e7eb;
+    color: #e5e7eb;
+  }
+  
+  .action-button.outline:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+  
+  .dark-mode .action-button.outline:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Toast styles */
+  .toast-success {
+    background: #16a34a;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .toast-error {
+    background: #dc2626;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Animation for pulse effect */
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 480px) {
+    .card {
+      padding: 24px;
+    }
+    .card-title {
+      font-size: 24px;
+    }
+    .dialog-content {
+      padding: 16px;
+    }
+    .dialog-title {
+      font-size: 20px;
+    }
+  }
