@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -72,7 +74,7 @@ export default function Home() {
       });
       return;
     }
-
+  
     if (!isSDKInitialized) {
       toast({
         title: 'Error',
@@ -81,28 +83,29 @@ export default function Home() {
       });
       return;
     }
-
+  
     setVerificationStatus('verifying');
     setVerificationError(null);
-
+  
     try {
-      if (!window.chrome?.runtime) {
-        throw new Error('Please use a Chrome-based browser with the Primus extension installed');
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        window.chrome.runtime.sendMessage(PRIMUS_EXTENSION_ID, { ping: true }, (response) => {
-          if (window.chrome.runtime.lastError || !response) {
-            reject(new Error('Primus extension not detected. Please install it from: https://primus.network'));
-          } else {
-            resolve();
-          }
-        });
-      });
-
       const request = primusZKTLS.generateRequestParams(BINANCE_KYC_TEMPLATE_ID, 'verification');
       request.setAttMode({ algorithmType: 'proxytls' });
-
+  
+      console.log('Sending attestation request to extension:', {
+        extensionId: PRIMUS_EXTENSION_ID,
+        message: {
+          type: 'padoZKAttestationJSSDK',
+          name: 'startAttestation',
+          params: {
+            sdkVersion: '1',
+            attestationTypeID: BINANCE_KYC_TEMPLATE_ID,
+            dappSymbol: 'KycTestApp',
+            attestationParameters: ['Basic Verification'],
+            algorithmType: 'proxytls',
+          },
+        },
+      });
+  
       const attestationResponse: PrimusResponse = await new Promise((resolve, reject) => {
         window.chrome.runtime.sendMessage(
           PRIMUS_EXTENSION_ID,
@@ -115,11 +118,16 @@ export default function Home() {
               dappSymbol: 'KycTestApp',
               attestationParameters: ['Basic Verification'],
               algorithmType: 'proxytls',
-              chainName: 'Solana',
             },
           },
           (response: PrimusResponse) => {
-            if (response.result === false) {
+            console.log('Extension response:', response);
+            if (window.chrome.runtime.lastError) {
+              console.error('Chrome runtime error:', window.chrome.runtime.lastError);
+              reject(new Error(`Extension communication failed: ${window.chrome.runtime.lastError.message}`));
+            } else if (!response) {
+              reject(new Error('No response received from Primus extension. Ensure it is loaded and running at chrome-extension://dechfgbdbnjhabdpjohaelfaipjfpfnh/home.html#/home.'));
+            } else if (response.result === false) {
               reject(new Error(`Attestation failed: ${response.errorData?.desc} (Code: ${response.errorData?.code})`));
             } else {
               resolve(response);
@@ -127,9 +135,9 @@ export default function Home() {
           }
         );
       });
-
+  
       console.log('Binance KYC attestation response:', attestationResponse);
-
+  
       const errorMap: { [key: string]: string } = {
         '00002': 'The verification process timed out. Please ensure you are logged into Binance and try again.',
         '00103': 'Invalid verification data. Please try again or contact support.',
@@ -137,16 +145,16 @@ export default function Home() {
         '00003': 'Another verification is in progress. Please wait and try again.',
         '00012': 'Invalid KYC template. Please contact support.',
         '00009': 'This website is not authorized for KYC verification. Please contact support.',
-        '00006': 'Primus extension not installed. Please install it from: https://primus.network',
+        '00006': 'Primus extension not detected. Please ensure it is loaded in Chrome Developer Mode at chrome-extension://dechfgbdbnjhabdpjohaelfaipjfpfnh/home.html#/home.',
       };
-
+  
       if (attestationResponse.result) {
         const { attestation } = attestationResponse.params!;
         const verifyResult = primusZKTLS.verifyAttestation(attestation);
         if (!verifyResult) {
           throw new Error('Attestation signature verification failed.');
         }
-
+  
         if (
           attestation.verificationContent === 'KYC Status' &&
           attestation.verificationValue === 'Basic Verification' &&
@@ -157,7 +165,7 @@ export default function Home() {
           toast({
             title: 'KYC Verified',
             description: 'Your Binance KYC status has been successfully verified!',
-            variant: 'default', // Assumes shadcn/ui has a default style for success
+            variant: 'default',
           });
         } else {
           throw new Error('Invalid attestation: does not match Binance KYC criteria.');
@@ -169,14 +177,30 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error('KYC verification error:', error);
-      const errorMessage = error.message || 'Failed to verify KYC status.';
-      setVerificationStatus('failed');
-      setVerificationError(errorMessage);
-      toast({
-        title: 'Verification Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      let errorMessage = error.message || 'Failed to verify KYC status.';
+  
+      // Handle extension-related errors
+      if (
+        errorMessage.includes('Extension communication failed') ||
+        errorMessage.includes('No response received from Primus extension')
+      ) {
+        errorMessage = 'Primus extension not detected. Please ensure it is loaded in Chrome Developer Mode at chrome-extension://dechfgbdbnjhabdpjohaelfaipjfpfnh/home.html#/home.';
+        setVerificationStatus('failed');
+        setVerificationError(errorMessage);
+        toast({
+          title: 'Verification Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      } else {
+        setVerificationStatus('failed');
+        setVerificationError(errorMessage);
+        toast({
+          title: 'Verification Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
     }
   };
 
