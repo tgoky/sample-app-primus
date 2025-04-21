@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { PrimusZKTLS } from '@primuslabs/zktls-js-sdk';
 import { Button } from '@/components/ui/button';
@@ -7,39 +8,13 @@ import { Clock, Check, X, Moon, Sun } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import './Home.css';
 
-// Configuration
 const APP_ID = process.env.NEXT_PUBLIC_PRIMUS_APP_ID || '0x3416e33be9a4c37a7d31cd0e16cf5783c0f12002';
 const GMAIL_TEMPLATE_ID = process.env.NEXT_PUBLIC_GMAIL_TEMPLATE_ID || '77a68f69-69bc-4247-a44e-b503c6379769';
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '406436486558-ng8vhi2pg691d38jh0q8l31f7o5nlruu.apps.googleusercontent.com';
 
-// Home.tsx (only showing updated parts)
-interface PrimusResponse {
+interface ExtensionAttestationResult {
   result: boolean;
-  params?: {
-    attestation: {
-      verificationContent: string;
-      verificationValue: string;
-      dataSourceId: string;
-      attestationType: string;
-      requestid?: string;
-      signature?: string;
-      algorithmType?: string;
-      schemaType?: string;
-      requests?: Array<{
-        url: string;
-        method: string;
-        headers: Record<string, string>;
-        queryString?: string;
-        body?: Record<string, unknown>; // Changed from any to unknown
-        urlType?: string;
-        response?: {
-          status: number;
-          headers: Record<string, string>;
-          body: Record<string, unknown>; // Changed from any to unknown
-        };
-      }>;
-    };
-  };
+  data?: any;
   errorData?: {
     code: string;
     desc: string;
@@ -53,50 +28,140 @@ export default function Home() {
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Initialize Primus ZKTLS SDK
   const primusZKTLS = new PrimusZKTLS();
 
+  // Initialize SDK
   useEffect(() => {
     const initSDK = async () => {
       try {
-        const initResult = await primusZKTLS.init(APP_ID);
-        console.log('Primus ZKTLS init result:', initResult);
-        setIsSDKInitialized(true);
+        const result = await primusZKTLS.init(APP_ID);
+        console.log('Primus ZKTLS initialized successfully:', result);
+        console.log('SDK isInitialized after init:', primusZKTLS.isInitialized);
+        setIsSDKInitialized(primusZKTLS.isInitialized);
       } catch (error: any) {
-        console.error('SDK initialization error:', error);
+        console.error('SDK initialization error:', {
+          message: error.message,
+          code: error.code,
+          stack: error.stack,
+        });
         setIsSDKInitialized(false);
+        toast({
+          title: 'Initialization Error',
+          description: 'Primus extension not detected. Please ensure it is installed and enabled.',
+          variant: 'destructive',
+        });
       }
     };
     initSDK();
   }, []);
 
+  // Handle extension messages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.data.type !== 'GMAIL_VERIFICATION_RESULT') {
-        return;
+      if (event.origin !== window.location.origin) return;
+
+      // Handle Primus extension messages
+      if (event.data.target === 'padoZKAttestationJSSDK') {
+        const params: ExtensionAttestationResult = event.data.params;
+        console.log(`Received ${event.data.name}:`, params);
+        if (event.data.name === 'initAttestationRes') {
+          console.log('initAttestationRes details:', {
+            result: params.result,
+            data: params.data,
+            isInitialized: primusZKTLS.isInitialized,
+          });
+        } else if (event.data.name === 'getAttestationRes') {
+          if (!params.result && params.errorData) {
+            console.error('Attestation error:', params.errorData);
+            setVerificationStatus('failed');
+            setVerificationError(params.errorData.desc || 'Attestation failed');
+            toast({
+              title: 'Verification Error',
+              description: params.errorData.desc || 'Attestation failed',
+              variant: 'destructive',
+            });
+          }
+        } else if (event.data.name === 'startAttestationRes') {
+          if (params.result && params.data) {
+            try {
+              console.log('Verifying attestation:', params.data);
+              const verifyResult = primusZKTLS.verifyAttestation(params.data);
+              if (verifyResult) {
+                setVerificationStatus('verified');
+                toast({
+                  title: 'Gmail Verified',
+                  description: 'Your Gmail account has been successfully verified!',
+                  variant: 'default',
+                });
+              } else {
+                throw new Error('Attestation verification failed');
+              }
+            } catch (error: any) {
+              console.error('Attestation verification error:', {
+                message: error.message,
+                stack: error.stack,
+              });
+              setVerificationStatus('failed');
+              setVerificationError(error.message || 'Verification failed');
+              toast({
+                title: 'Verification Error',
+                description: error.message || 'Verification failed',
+                variant: 'destructive',
+              });
+            }
+          } else if (params.errorData) {
+            console.error('Attestation error:', params.errorData);
+            setVerificationStatus('failed');
+            setVerificationError(params.errorData.desc || 'Attestation failed');
+            toast({
+              title: 'Verification Error',
+              description: params.errorData.desc || 'Attestation failed',
+              variant: 'destructive',
+            });
+          }
+        }
       }
-      console.log('Received GMAIL_VERIFICATION_RESULT:', event.data);
-      if (event.data.success) {
-        try {
-          completeVerification(event.data);
-        } catch (error: any) {
-          console.error('Complete verification error:', error);
+
+      // Handle Google OAuth callback
+      if (event.data.type === 'GMAIL_VERIFICATION_RESULT') {
+        console.log('Received GMAIL_VERIFICATION_RESULT:', event.data);
+        if (event.data.success && event.data.params?.attestation) {
+          try {
+            const { attestation } = event.data.params;
+            console.log('Verifying Google OAuth attestation:', attestation);
+            const verifyResult = primusZKTLS.verifyAttestation(attestation);
+            if (verifyResult) {
+              setVerificationStatus('verified');
+              toast({
+                title: 'Gmail Verified',
+                description: 'Your Gmail account has been successfully verified!',
+                variant: 'default',
+              });
+            } else {
+              throw new Error('Attestation verification failed');
+            }
+          } catch (error: any) {
+            console.error('Verification error:', {
+              message: error.message,
+              stack: error.stack,
+            });
+            setVerificationStatus('failed');
+            setVerificationError(error.message || 'Verification failed');
+            toast({
+              title: 'Verification Error',
+              description: error.message || 'Verification failed',
+              variant: 'destructive',
+            });
+          }
+        } else {
           setVerificationStatus('failed');
-          setVerificationError(error.message || 'Verification failed');
+          setVerificationError(event.data.error || 'Gmail verification failed');
           toast({
             title: 'Verification Error',
-            description: error.message || 'Verification failed',
+            description: event.data.error || 'Gmail verification failed',
             variant: 'destructive',
           });
         }
-      } else {
-        setVerificationStatus('failed');
-        setVerificationError(event.data.error || 'Gmail verification failed');
-        toast({
-          title: 'Verification Error',
-          description: event.data.error || 'Gmail verification failed',
-          variant: 'destructive',
-        });
       }
     };
 
@@ -106,12 +171,42 @@ export default function Home() {
 
   const directGmailVerification = async () => {
     try {
-      // Generate attestation parameters using Primus ZKTLS
-      const request = primusZKTLS.generateRequestParams(GMAIL_TEMPLATE_ID, 'verification');
-      request.setAttMode({ algorithmType: 'proxytls', resultType: 'plain' });
-      request.appId = APP_ID;
+      // Check if extension is available
+      if (!window.primus) {
+        throw new Error('Primus extension not detected. Please install it.');
+      }
+      console.log('Primus extension detected:', window.primus);
 
-      // Sign the attestation parameters
+      // Reinitialize SDK if not initialized
+      if (!primusZKTLS.isInitialized) {
+        console.log('SDK not initialized, reinitializing...');
+        await primusZKTLS.init(APP_ID);
+        console.log('SDK reinitialized, isInitialized:', primusZKTLS.isInitialized);
+        setIsSDKInitialized(primusZKTLS.isInitialized);
+        if (!primusZKTLS.isInitialized) {
+          throw new Error('Failed to reinitialize SDK');
+        }
+      }
+
+      // Generate request with extension support
+      const request = primusZKTLS.generateRequestParams(GMAIL_TEMPLATE_ID, '0x0000000000000000000000000000000000000000');
+      request.setAttMode({
+        algorithmType: 'proxytls',
+        resultType: 'plain',
+        withExtension: true,
+        httpRequests: [{
+          url: 'https://accounts.google.com/o/oauth2/v2/auth',
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          queryString: `client_id=${GOOGLE_CLIENT_ID}&response_type=code&scope=email profile&redirect_uri=${encodeURIComponent(process.env.NEXTAUTH_URL + '/api/google/callback')}`,
+          body: {},
+          urlType: 'EXACT',
+        }],
+      });
+      request.appId = APP_ID;
+      console.log('Generated request params:', request);
+
+      // Sign the request
       const signResponse = await fetch('/api/sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,90 +214,52 @@ export default function Home() {
       });
 
       if (!signResponse.ok) {
-        throw new Error('Failed to sign attestation parameters');
+        const errorData = await signResponse.json();
+        console.error('Sign response error:', errorData);
+        throw new Error(errorData.error || 'Failed to sign attestation parameters');
       }
 
       const { signResult } = await signResponse.json();
+      console.log('Received signResult:', signResult);
 
-      // Open Google OAuth popup
-      const popup = window.open(
-        `https://accounts.google.com/o/oauth2/v2/auth?` +
-          `client_id=${GOOGLE_CLIENT_ID}&` +
-          'response_type=code&' +
-          'scope=email profile&' +
-          `redirect_uri=${window.location.origin}/api/google/callback&` +
-          `state=${encodeURIComponent(JSON.stringify(signResult))}`,
-        '_blank',
-        'width=500,height=600'
-      );
-
-      if (!popup) {
-        throw new Error('Failed to open verification popup');
+      if (!signResult.signature || !signResult.requestid) {
+        throw new Error('Invalid signResult structure from /api/sign');
       }
 
+      // Ensure signResult uses appSignature for compatibility
+      const attestationParams = {
+        ...signResult,
+        appSignature: signResult.signature, // Map signature to appSignature
+      };
+      console.log('Prepared attestation params:', attestationParams);
+
+      // Verify SDK initialization state
+      console.log('SDK isInitialized before startAttestation:', primusZKTLS.isInitialized);
+      if (!primusZKTLS.isInitialized) {
+        throw new Error('SDK not initialized before starting attestation');
+      }
+
+      // Start attestation with extension
       setVerificationStatus('verifying');
+      console.log('Starting attestation with params:', attestationParams);
+      const attestation = await primusZKTLS.startAttestation(JSON.stringify(attestationParams));
+      console.log('Attestation result:', attestation);
     } catch (error: any) {
-      console.error('Direct verification error:', error);
+      console.error('Verification error:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        data: error.data,
+      });
       setVerificationStatus('failed');
-      setVerificationError(error.message || 'Verification failed');
+      setVerificationError(error.message || 'Verification failed. Please check the console for details.');
       toast({
         title: 'Verification Error',
-        description: error.message || 'Verification failed',
+        description: error.message || 'Verification failed. Please check the console for details.',
         variant: 'destructive',
       });
     }
   };
-
-  const completeVerification = (response: PrimusResponse) => {
-    console.log('completeVerification response:', response);
-    if (!response || !response.result || !response.params?.attestation) {
-      throw new Error('Invalid verification response');
-    }
-  
-    const { attestation } = response.params;
-    console.log('Attestation object:', attestation);
-  
-    // Ensure the attestation has the required structure
-    const attestationWithRequests = {
-      ...attestation,
-      schemaType: attestation.schemaType || 'http',
-      requests: [
-        {
-          url: 'https://accounts.google.com/o/oauth2/v2/auth',
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          queryString: `client_id=${GOOGLE_CLIENT_ID}&response_type=code&scope=email profile`,
-          body: {},
-          urlType: 'EXACT',
-          response: {
-            status: 200,
-            headers: {},
-            body: {}
-          }
-        }
-      ]
-    };
-  
-    console.log('Attestation with requests:', attestationWithRequests);
-    
-    try {
-      const verifyResult = primusZKTLS.verifyAttestation(attestationWithRequests);
-      if (verifyResult) {
-        setVerificationStatus('verified');
-        toast({
-          title: 'Gmail Verified',
-          description: 'Your Gmail account has been successfully verified!',
-          variant: 'default',
-        });
-      } else {
-        throw new Error('Attestation verification failed');
-      }
-    } catch (error: any) {
-      console.error('Attestation verification error:', error);
-      throw new Error(`Attestation verification failed: ${error.message}`);
-    }
-  };
-  
 
   const verifyIdentity = async () => {
     if (!isSDKInitialized) {

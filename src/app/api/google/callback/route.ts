@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { OAuth2Client } from 'google-auth-library';
 
 const client = new OAuth2Client(
@@ -39,39 +39,38 @@ export async function GET(req: NextRequest) {
     }
 
     // Construct PrimusResponse with attestation, using requests as an array
- // In your Google callback API
-const primusResponse = {
-  result: true,
-  params: {
-    attestation: {
-      verificationContent: 'Account ownership',
-      verificationValue: payload.email,
-      dataSourceId: 'google',
-      attestationType: 'Humanity Verification',
-      requestid: signResult.requestid || signResult.appId || 'unknown',
-      signature: signResult.signature || undefined,
-      algorithmType: signResult.algorithmType || 'proxytls',
-      schemaType: 'http',
-      requests: [
-        {
-          url: 'https://accounts.google.com/o/oauth2/v2/auth',
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          queryString: `client_id=${process.env.GOOGLE_CLIENT_ID}&response_type=code&scope=email profile`,
-          body: {},
-          urlType: 'EXACT',
-          response: {
-            status: 200,
-            headers: {},
-            body: {}
-          }
+    const primusResponse = {
+      result: true,
+      params: {
+        attestation: {
+          verificationContent: 'Account ownership',
+          verificationValue: payload.email,
+          dataSourceId: 'google',
+          attestationType: 'Humanity Verification',
+          requestid: signResult.requestid || signResult.appId || 'unknown',
+          signature: signResult.signature || undefined,
+          algorithmType: signResult.algorithmType || 'proxytls',
+          schemaType: 'http',
+          requests: [
+            {
+              url: 'https://accounts.google.com/o/oauth2/v2/auth',
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              queryString: `client_id=${process.env.GOOGLE_CLIENT_ID}&response_type=code&scope=email profile`,
+              body: {},
+              urlType: 'EXACT',
+              response: {
+                status: 200,
+                headers: {},
+                body: {}
+              }
+            }
+          ]
         }
-      ]
-    }
-  }
-};
+      }
+    };
 
     return successResponse(primusResponse);
   } catch (error) {
@@ -88,7 +87,7 @@ function successResponse(primusResponse: any) {
           window.opener.postMessage({
             type: 'GMAIL_VERIFICATION_RESULT',
             success: true,
-            ...${JSON.stringify(primusResponse)}
+            ${JSON.stringify(primusResponse).slice(1, -1)}
           }, '${process.env.NEXTAUTH_URL}');
           window.close();
         </script>
