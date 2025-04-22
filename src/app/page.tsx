@@ -8,9 +8,8 @@ import { Clock, Check, X, Moon, Sun } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import './Home.css';
 
-const APP_ID = process.env.NEXT_PUBLIC_PRIMUS_APP_ID || '0x3416e33be9a4c37a7d31cd0e16cf5783c0f12002';
-const GMAIL_TEMPLATE_ID = process.env.NEXT_PUBLIC_GMAIL_TEMPLATE_ID || '77a68f69-69bc-4247-a44e-b503c6379769';
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '406436486558-ng8vhi2pg691d38jh0q8l31f7o5nlruu.apps.googleusercontent.com';
+const APP_ID = '0x3416e33be9a4c37a7d31cd0e16cf5783c0f12002';
+const BINANCE_KYC_TEMPLATE_ID = '9859330b-b94f-47a4-8f13-0ca56dabe273'; // Updated to Binance KYC template ID
 
 interface ExtensionAttestationResult {
   result: boolean;
@@ -27,6 +26,8 @@ export default function Home() {
   const [verificationStatus, setVerificationStatus] = useState<'idle' | 'verifying' | 'verified' | 'failed'>('idle');
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null); // Changed to store userId
+  const [kycStatus, setKycStatus] = useState<string | null>(null); // Added to store KYC status
 
   const primusZKTLS = new PrimusZKTLS();
 
@@ -36,7 +37,6 @@ export default function Home() {
       try {
         const result = await primusZKTLS.init(APP_ID);
         console.log('Primus ZKTLS initialized successfully:', result);
-        console.log('SDK isInitialized after init:', primusZKTLS.isInitialized);
         setIsSDKInitialized(primusZKTLS.isInitialized);
       } catch (error: any) {
         console.error('SDK initialization error:', {
@@ -75,6 +75,8 @@ export default function Home() {
             console.error('Attestation error:', params.errorData);
             setVerificationStatus('failed');
             setVerificationError(params.errorData.desc || 'Attestation failed');
+            setVerifiedUserId(null);
+            setKycStatus(null);
             toast({
               title: 'Verification Error',
               description: params.errorData.desc || 'Attestation failed',
@@ -87,10 +89,16 @@ export default function Home() {
               console.log('Verifying attestation:', params.data);
               const verifyResult = primusZKTLS.verifyAttestation(params.data);
               if (verifyResult) {
+                // Extract userId and kycStatus from attestation data
+                const attestationData = JSON.parse(params.data.data || '{}');
+                const userId = attestationData['userId'] || 'Unknown user';
+                const kycStatus = attestationData['kycStatus'] || 'Unknown status';
+                setVerifiedUserId(userId);
+                setKycStatus(kycStatus);
                 setVerificationStatus('verified');
                 toast({
-                  title: 'Gmail Verified',
-                  description: 'Your Gmail account has been successfully verified!',
+                  title: 'Binance KYC Verified',
+                  description: `Binance KYC for user ${userId} verified with status: ${kycStatus}`,
                   variant: 'default',
                 });
               } else {
@@ -103,6 +111,8 @@ export default function Home() {
               });
               setVerificationStatus('failed');
               setVerificationError(error.message || 'Verification failed');
+              setVerifiedUserId(null);
+              setKycStatus(null);
               toast({
                 title: 'Verification Error',
                 description: error.message || 'Verification failed',
@@ -113,6 +123,8 @@ export default function Home() {
             console.error('Attestation error:', params.errorData);
             setVerificationStatus('failed');
             setVerificationError(params.errorData.desc || 'Attestation failed');
+            setVerifiedUserId(null);
+            setKycStatus(null);
             toast({
               title: 'Verification Error',
               description: params.errorData.desc || 'Attestation failed',
@@ -122,19 +134,23 @@ export default function Home() {
         }
       }
 
-      // Handle Google OAuth callback
-      if (event.data.type === 'GMAIL_VERIFICATION_RESULT') {
-        console.log('Received GMAIL_VERIFICATION_RESULT:', event.data);
+      // Handle Binance KYC verification result (if applicable)
+      if (event.data.type === 'BINANCE_KYC_VERIFICATION_RESULT') {
+        console.log('Received BINANCE_KYC_VERIFICATION_RESULT:', event.data);
         if (event.data.success && event.data.params?.attestation) {
           try {
             const { attestation } = event.data.params;
-            console.log('Verifying Google OAuth attestation:', attestation);
+            console.log('Verifying Binance KYC attestation:', attestation);
             const verifyResult = primusZKTLS.verifyAttestation(attestation);
             if (verifyResult) {
+              const userId = attestation.userId || 'Unknown user';
+              const kycStatus = attestation.kycStatus || 'Unknown status';
+              setVerifiedUserId(userId);
+              setKycStatus(kycStatus);
               setVerificationStatus('verified');
               toast({
-                title: 'Gmail Verified',
-                description: 'Your Gmail account has been successfully verified!',
+                title: 'Binance KYC Verified',
+                description: `Binance KYC for user ${userId} verified with status: ${kycStatus}`,
                 variant: 'default',
               });
             } else {
@@ -147,6 +163,8 @@ export default function Home() {
             });
             setVerificationStatus('failed');
             setVerificationError(error.message || 'Verification failed');
+            setVerifiedUserId(null);
+            setKycStatus(null);
             toast({
               title: 'Verification Error',
               description: error.message || 'Verification failed',
@@ -155,10 +173,12 @@ export default function Home() {
           }
         } else {
           setVerificationStatus('failed');
-          setVerificationError(event.data.error || 'Gmail verification failed');
+          setVerificationError(event.data.error || 'Binance KYC verification failed');
+          setVerifiedUserId(null);
+          setKycStatus(null);
           toast({
             title: 'Verification Error',
-            description: event.data.error || 'Gmail verification failed',
+            description: event.data.error || 'Binance KYC verification failed',
             variant: 'destructive',
           });
         }
@@ -169,7 +189,7 @@ export default function Home() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const directGmailVerification = async () => {
+  const directBinanceKYCVerification = async () => {
     try {
       // Check if extension is available
       if (!window.primus) {
@@ -188,17 +208,17 @@ export default function Home() {
         }
       }
 
-      // Generate request with extension support
-      const request = primusZKTLS.generateRequestParams(GMAIL_TEMPLATE_ID, '0x0000000000000000000000000000000000000000');
+      // Generate request for Binance KYC
+      const request = primusZKTLS.generateRequestParams(BINANCE_KYC_TEMPLATE_ID, '0x0000000000000000000000000000000000000000');
       request.setAttMode({
         algorithmType: 'proxytls',
         resultType: 'plain',
         withExtension: true,
         httpRequests: [{
-          url: 'https://accounts.google.com/o/oauth2/v2/auth',
+          url: 'https://www.binance.com/bapi/kyc/v2/private/certificate/user-kyc/current-kyc-status',
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
-          queryString: `client_id=${GOOGLE_CLIENT_ID}&response_type=code&scope=email profile&redirect_uri=${encodeURIComponent(process.env.NEXTAUTH_URL + '/api/google/callback')}`,
+          queryString: '', // Adjust if Binance API requires specific query parameters
           body: {},
           urlType: 'EXACT',
         }],
@@ -253,6 +273,8 @@ export default function Home() {
       });
       setVerificationStatus('failed');
       setVerificationError(error.message || 'Verification failed. Please check the console for details.');
+      setVerifiedUserId(null);
+      setKycStatus(null);
       toast({
         title: 'Verification Error',
         description: error.message || 'Verification failed. Please check the console for details.',
@@ -272,7 +294,9 @@ export default function Home() {
     }
 
     setVerificationError(null);
-    await directGmailVerification();
+    setVerifiedUserId(null);
+    setKycStatus(null);
+    await directBinanceKYCVerification();
   };
 
   const toggleTheme = () => {
@@ -285,22 +309,29 @@ export default function Home() {
         {isDarkMode ? <Sun size={24} /> : <Moon size={24} />}
       </button>
       <div className="card">
-        <h1 className="card-title">Gmail Verification</h1>
+        <h1 className="card-title">Binance KYC Verification</h1>
         <div className="card-content">
-          <Button
-            onClick={verifyIdentity}
-            disabled={verificationStatus === 'verifying'}
-            className={`verify-button ${verificationStatus === 'verifying' ? 'verifying' : ''}`}
-          >
-            {verificationStatus === 'verifying' ? (
-              <span className="button-content">
-                <Clock className="button-icon" />
-                Verifying...
-              </span>
-            ) : (
-              'Verify Gmail Account'
-            )}
-          </Button>
+          {verifiedUserId && kycStatus ? (
+            <div className="verified-status">
+              <Check className="verified-icon" />
+              <p className="verified-text">Verified: User {verifiedUserId} with KYC Status: {kycStatus}</p>
+            </div>
+          ) : (
+            <Button
+              onClick={verifyIdentity}
+              disabled={verificationStatus === 'verifying'}
+              className={`verify-button ${verificationStatus === 'verifying' ? 'verifying' : ''}`}
+            >
+              {verificationStatus === 'verifying' ? (
+                <span className="button-content">
+                  <Clock className="button-icon" />
+                  Verifying...
+                </span>
+              ) : (
+                'Verify Binance KYC'
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -310,13 +341,18 @@ export default function Home() {
           if (!open) {
             setVerificationStatus('idle');
             setVerificationError(null);
+            setVerifiedUserId(null);
+            setKycStatus(null);
           }
         }}
       >
-        <DialogContent className="dialog-content">
+        <DialogContent className="dialog-content" aria-describedby="dialog-description">
           <DialogHeader>
-            <DialogTitle className="dialog-title">Gmail Verification</DialogTitle>
+            <DialogTitle className="dialog-title">Binance KYC Verification</DialogTitle>
           </DialogHeader>
+          <div id="dialog-description" className="sr-only">
+            Dialog for displaying the status of Binance KYC verification process
+          </div>
           <div className="dialog-body">
             {verificationStatus === 'verifying' && (
               <>
@@ -331,7 +367,9 @@ export default function Home() {
                 <div className="status-icon verified">
                   <Check className="icon" />
                 </div>
-                <p className="status-text">Gmail verified successfully!</p>
+                <p className="status-text">
+                  Binance KYC verified successfully! {verifiedUserId ? `User: ${verifiedUserId}` : ''} {kycStatus ? `Status: ${kycStatus}` : ''}
+                </p>
                 <Button onClick={() => setVerificationStatus('idle')} className="action-button">
                   Close
                 </Button>

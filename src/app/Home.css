@@ -231,6 +231,36 @@
   .link:hover {
     text-decoration: underline;
   }
+
+  .verified-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #2ecc71;
+    font-size: 16px;
+    font-weight: 500;
+  }
+  
+  .verified-icon {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .verified-text {
+    margin: 0;
+  }
+  
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+  
   
   .action-button {
     padding: 10px 20px;
